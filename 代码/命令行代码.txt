@@ -1,0 +1,204 @@
+2.3.1
+cd /usr/local/hadoop
+./sbin/start-all.sh
+cd /usr/local/bigdata/dataset
+head-10 rent.csv
+bash ./pre_rent.sh rent.csv rent.txt
+
+2.3.2
+./bin/hdfs dfs -mkdir -p /bigdata/dataset
+./bin/hdfs dfs -put /usr/local/bigdata/dataset/rent.txt /bigdata/dataset
+
+3.1Spark sql
+cd /usr/local/spark
+bin/spark-shell
+
+
+3.1.1
+import org.apache.spark.sql.SparkSession
+val df = spark.read.format("csv").option("header", "true").option("inferSchema", "true").load("file:///usr/local/bigdata/dataset/rent.csv").toDF("district","address","area","orientation","room","living","bathroom","floor","rent","null")
+df.createOrReplaceTempView("myrent")
+
+val top10 = spark.sql("SELECT address, AVG(rent) AS avg_rent FROM myrent GROUP BY address ORDER BY avg_rent DESC LIMIT 10")
+top10.show()
+top10.rdd.map(row => row.mkString(",")).saveAsTextFile("file:///usr/local//bigdata/spark_sql/top_10_rent")
+
+3.1.2
+val area_show = spark.sql("SELECT address,MAX(area) AS max_area, MIN(area) AS min_area from myrent group by(address)")
+area_show.show()
+area_show.rdd.map(row => row.mkString(",")).saveAsTextFile("file:///usr/local//bigdata/spark_sql/area_show")
+
+3.1.3
+val rent_show = spark.sql("SELECT address,avg(area) AS avg_area,avg(rent) AS avg_rent FROM myrent group by(address)")
+rent_show.show()
+rent_show.rdd.map(row => row.mkString(",")).saveAsTextFile("file:///usr/local//bigdata/spark_sql/rent_show")
+
+3.1.4
+val count_rent = spark.sql("SELECT district,count(*) as count_district FROM myrent where rent>1000  group by(district)")
+count_rent.show()
+count_rent.rdd.map(row => row.mkString(",")).saveAsTextFile("file:///usr/local//bigdata/spark_sql/count_rent")
+
+3.1.5
+val min_rent = spark.sql("SELECT address,min(rent) as min_rent FROM myrent where room>1 and living>1 and bathroom>1 group by(address)")
+min_rent.show()
+min_rent.rdd.map(row => row.mkString(",")).saveAsTextFile("file:///usr/local//bigdata/spark_sql/min_rent")
+
+5.1
+cd /usr/local/spark
+./bin/spark-shell
+
+import org.apache.spark.ml.clustering.{KMeans, KMeansModel}
+import org.apache.spark.ml.evaluation.ClusteringEvaluator
+import org.apache.spark.ml.feature.{StandardScaler, VectorAssembler, StringIndexer}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.ml.clustering.KMeans
+import org.apache.spark.ml.feature.{VectorAssembler, StringIndexer, OneHotEncoder}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.ml.Pipeline
+import org.apache.spark.ml.feature.{OneHotEncoder, StringIndexer, VectorAssembler}
+import org.apache.spark.ml.linalg.Vector
+import spark.implicits._
+import org.apache.spark.ml.tuning.ParamGridBuilder
+import org.apache.spark.ml.tuning.CrossValidator
+import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
+
+val spark = SparkSession.builder().appName("HousingClusterAnalysis").getOrCreate()
+
+case class model_instance (features: districtVec, addressVec, area, room, living, bathroom, floor)
+
+// 导入数据
+val df = spark.read.format("csv").option("header", "true").option("inferSchema", "true").load("file:///usr/local/bigdata/dataset/rent.csv").toDF("district","address","area","orientation","room","living","bathroom","floor","rent","null")
+
+val colsToDrop = Seq("null") 
+val data = df.drop(colsToDrop:_*)
+
+// 字符串编码和独热编码
+val districtIndexer = new StringIndexer().setInputCol("district").setOutputCol("districtIndex")
+val districtEncoded = new OneHotEncoder().setInputCol("districtIndex").setOutputCol("districtVec")
+val addressIndexer  = new StringIndexer().setInputCol("address").setOutputCol("addressIndex")
+val addressEncoded = new OneHotEncoder().setInputCol("addressIndex").setOutputCol("addressVec")
+
+// 将特征向量合并为一个向量列
+val assembler = new VectorAssembler().setInputCols(Array("districtVec", "addressVec", "area", "room", "living", "bathroom", "floor")).setOutputCol("features")
+
+// 将Pipeline组合到一个流程中
+val pipeline = new Pipeline().setStages(Array(districtIndexer, addressIndexer, districtEncoded, addressEncoded, assembler))
+
+// 使用流程，处理数据并拟合KMeans模型
+val pipelineModel = pipeline.fit(data)
+val preprocessedDF = pipelineModel.transform(data)
+val kmeans = new KMeans().setK(3).setFeaturesCol("features").setPredictionCol("prediction")
+val model = kmeans.fit(preprocessedDF)
+
+// 使用模型进行预测，并展示结果
+val predictions = model.transform(preprocessedDF)
+predictions.show()
+
+// 输出每个簇的大小
+predictions.groupBy("prediction").agg(avg("districtIndex"),avg("area"), avg("room"), avg("living"), avg("bathroom"), avg("floor"), avg("rent")).orderBy("prediction").show()
+
+//输出每个簇的数据统计信息
+predictions.groupBy("prediction").count.orderBy("prediction").show()
+
+
+//模型的所有聚类中心情况
+model.clusterCenters.foreach(center => {println("Clustering Center:"+center)})
+
+//计算集合内误差平方和的方法来度量聚类的有效性
+model.computeCost(preprocessedDF)
+
+//平分k均值
+import org.apache.spark.ml.clustering.BisectingKMeans
+val bkm = new BisectingKMeans().setK(3).setSeed(1)
+val bk_model = bkm.fit(preprocessedDF)
+val bk_predictions = bk_model.transform(preprocessedDF)
+bk_predictions.groupBy("prediction").count.orderBy("prediction").show()
+bk_model.computeCost(preprocessedDF)
+
+// 结束SparkSession
+spark.stop()
+
+
+5.2
+import org.apache.spark.ml.regression.LinearRegression
+import org.apache.spark.ml.regression.LinearRegressionModel
+import org.apache.spark.ml.feature.VectorAssembler
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.ml.evaluation.RegressionEvaluator
+import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel}
+import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
+import org.apache.spark.ml.feature.VectorAssembler
+
+// 创建SparkSession
+val spark = SparkSession.builder().appName("Lasso and Ridge Regression Examples").getOrCreate()
+
+// 读取数据
+val df = spark.read.format("csv").option("header", "true").option("inferSchema", "true").load("file:///usr/local/bigdata/dataset/rent.csv").toDF("district","address","area","orientation","room","living","bathroom","floor","rent","null")
+val colsToDrop = Seq("null") 
+val data = df.drop(colsToDrop:_*)
+
+// 字符串编码和独热编码
+val districtIndexer = new StringIndexer().setInputCol("district").setOutputCol("districtIndex")
+val districtEncoded = new OneHotEncoder().setInputCol("districtIndex").setOutputCol("districtVec")
+val addressIndexer  = new StringIndexer().setInputCol("address").setOutputCol("addressIndex")
+val addressEncoded = new OneHotEncoder().setInputCol("addressIndex").setOutputCol("addressVec")
+
+// 将特征向量合并为一个向量列
+val assembler = new VectorAssembler().setInputCols(Array("districtVec", "addressVec", "area", "room", "living", "bathroom", "floor")).setOutputCol("features")
+
+// 将Pipeline组合到一个流程中
+val pipeline = new Pipeline().setStages(Array(districtIndexer, addressIndexer, districtEncoded, addressEncoded, assembler))
+
+// 使用流程，处理数据并拟合Lasso回归模型
+val pipelineModel = pipeline.fit(data)
+val preprocessedDF = pipelineModel.transform(data)
+
+// 定义、拟合Lasso回归模型
+val lasso = new LinearRegression().setElasticNetParam(1).setRegParam(0.01).setLabelCol("rent")
+
+val lassoModel = lasso.fit(preprocessedDF)
+
+// 均方根误差(RMSE)评估
+val lassoEvaluator = new RegressionEvaluator().setLabelCol("rent").setPredictionCol("prediction").setMetricName("rmse")
+val lassoPredictions = lassoModel.transform(preprocessedDF)
+val lassoRmse = lassoEvaluator.evaluate(lassoPredictions)
+
+// 打印Lasso回归模型系数
+println(s"Lasso Coefficients: ${lassoModel.coefficients}")
+
+//查看结果
+lassoPredictions.show(10)
+
+// 设置Lasso参数网格
+val lassoParamGrid = new ParamGridBuilder().addGrid(lasso.regParam, Array(0.01, 0.1, 1.0, 10.0)).build()
+
+// 定义评估器
+val evaluator = new RegressionEvaluator().setLabelCol("rent").setPredictionCol("prediction").setMetricName("mae")
+
+// 使用交叉验证调优Lasso回归模型
+val lassoCV = new CrossValidator().setEstimator(lasso).setEvaluator(evaluator).setEstimatorParamMaps(lassoParamGrid).setNumFolds(5)
+
+val lassoCVModel = lassoCV.fit(preprocessedDF)
+
+// 打印Lasso交叉验证模型最优参数和MAE
+println(s"Lasso CV Model - Best Parameter: ${lassoCVModel.bestModel.asInstanceOf[LinearRegressionModel].getRegParam}")
+val lassoPredictions = lassoCVModel.transform(preprocessedDF)
+val lassoMAE = evaluator.evaluate(lassoPredictions)
+println(s"Lasso CV Model - MAE: $lassoMAE")
+
+6.1.2
+// 启动kafka
+cd /usr/local/kafka
+./bin/zookeeper-server-start.sh config/zookeeper.properties
+
+cd /usr/local/kafka
+bin/kafka-server-start.sh config/server.properties
+
+// 打包
+cd /usr/local/spark/mycode/kafka
+/usr/local/sbt/sbt package
+
+// 运行脚本
+cd /usr/local/spark/mycode/kafka
+sh startup.sh

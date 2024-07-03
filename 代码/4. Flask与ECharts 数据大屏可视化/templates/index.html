@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>index</title>
+<script type="text/javascript" src="../static/js/jquery.js"></script>
+<link rel="stylesheet" href="../static/css/comon0.css">
+<link rel="shortcut icon" href="/static/favicon.ico"/>
+</head>
+	<script>
+		$(document).ready(function(){
+			var whei=$(window).width()
+			$("html").css({fontSize:whei/22})
+			$(window).resize(function(){
+				var whei=$(window).width()
+			 $("html").css({fontSize:whei/22})
+		});
+			});
+	</script>
+	<script type="text/javascript" src="../static/js/echarts.min.js"></script> 
+	<script language="JavaScript" src="../static/js/js.js"></script> 
+<body>
+<div class="canvas" style="opacity: .2">
+	<iframe frameborder="0" src="../static/js/index.html" style="width: 100%; height: 100%"></iframe>
+</div>
+
+<div class="head">
+  <h1>出租房屋大数据分析可视化</h1>
+  <span id="showTime"></span>
+	
+  <script>
+		var t = null;
+			t = setTimeout(time,1000*1);//開始运行
+			function time()
+			{
+			   clearTimeout(t);//清除定时器
+			   dt = new Date();
+				var y=dt.getFullYear();
+				var mt=dt.getMonth()+1;
+				var day=dt.getDate();
+			   var h=dt.getHours();//获取时
+			   var m=dt.getMinutes();//获取分
+			   var s=dt.getSeconds();//获取秒
+			   document.getElementById("showTime").innerHTML = y+"年"+mt+"月"+day+"日-"+h+"时"+m+"分"+s+"秒";
+			   t = setTimeout(time,1000*1); //设定定时器，循环运行     
+			} 
+	</script>
+</div>
+<div class="mainbox">
+  <ul class="clearfix">
+    <li>
+      <div class="boxall" style="height: 3rem">
+			  <div style="height:100%; width: 100%;">
+					<div class="alltitle">总体情况预览</div>
+			    <ul class="txt">
+				    <li>
+				    	<h2 id="order"></h2>
+				    	<span>房源数量</span>
+				    </li>
+				    <li>
+				    	<h2 id="profit"></h2>
+				    	<span>房源均面积</span>
+				    </li>
+				  
+				  </ul>
+				  <ul class="txt">
+				    <li>
+				    	<h2 id="customer"></h2>
+				    	<span>房间数量</span>
+				    </li>
+				    <li>
+				    	<h2 id="ATV"></h2>
+				    	<span>租房均价</span>
+				    </li>
+				  </ul>
+          <div class="boxfoot"></div>
+        </div>
+			</div>
+      <div class="boxall" style="height: 3.3rem">
+        <div class="alltitle">深圳、佛山各项指标对比</div>
+        <div class="allnav" id="echart_l2"></div>
+        <div class="boxfoot"></div>
+      </div>
+      <div class="boxall" style="height: 3.3rem">
+        <div class="alltitle">不同朝向房间数量、楼层</div>
+        <div class="allnav" id="echart_l3"></div>
+				<div class="boxfoot"></div>
+		  
+        
+      </div>
+    </li>
+    
+		<li>
+      <div class="bar">
+          <div class="barbox">
+              <div class="center_txt_box">
+                  <div class="center_txt" id="month_sales"></div>
+				  <div class="center_txt1">城区覆盖量</div>
+              </div>
+			  <div class="center_chart_box">
+			      <div id="echart_c11" style=" height:100%; width:100%; float: left; "></div>				  
+			  </div>
+              <div class="center_txt_box">
+                  <div class="center_txt" id="year_sales"></div>
+				  <div class="center_txt1">乡县覆盖量</div>
+              </div>					
+			  <div class="center_chart_box">
+			      <div id="echart_c12" style=" height:100%; width:100%; float: left; "></div>
+			  </div>
+          </div>
+      </div>
+			
+      <div class="map">
+        <div class="map4" id="map_1"></div>
+      </div>
+    </li>
+    
+		<li>
+      <div class="boxall" style="height:3.2rem">
+        <div class="alltitle">地区租金与面积图</div>
+        <div class="allnav" id="echart_r1"></div>
+        <div class="boxfoot"></div>
+      </div>
+      <div class="boxall" style="height: 3.2rem">
+		  <div style=" height:100%; width:100%; float: left; ">
+				<div class="alltitle">房源数量前十</div>
+				<div id="echart_r21" class="allnav" ></div>
+		  </div>
+<!--		  <div style=" height:100%; width:60%; float: left; ">-->
+<!--				<div class="alltitle">产品四象限图</div>-->
+<!--				<div id="echart_r22" class="allnav" ></div>	-->
+<!--		  </div>-->
+        <div class="boxfoot"></div>
+      </div>
+      <div class="boxall" style="height: 3.2rem">
+        <div class="alltitle">租房类型对比</div>
+        <div class="allnav" id="echart_r3"></div>
+        <div class="boxfoot"></div>
+      </div>
+    </li>
+  </ul>
+</div>
+
+<script type="text/javascript" src="../static/js/china.js"></script>
+</body>
+</html>

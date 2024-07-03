@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>出租房屋数量分析</title>
+
+    <script src="static/js/socket.io.js"></script>
+    <script src="static/js/jquery-3.1.1.min.js"></script>
+    <script src="static/js/highcharts.js"></script>
+    <script src="static/js/exporting.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #container {
+            height: 400px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+<div>
+    <b>平价房屋（affordable-rooms）: </b><b id="affordable-rooms"></b><br>
+    <b>豪华房屋（luxury-house）: </b><b id="luxury-house"></b>
+</div>
+<div id="container"></div>
+
+<script>
+    var socket = io();
+
+    socket.on('connect', function() {
+        console.log('Connected to server');
+    });
+
+    socket.on('aqi_message', function(message) {
+        console.log(message);
+        var affordableRooms = parseFloat(message.affordable_rooms).toFixed(2);
+        var luxuryHouse = parseFloat(message.luxury_house).toFixed(2);
+        $('#affordable-rooms').text(affordableRooms);
+        $('#luxury-house').text(luxuryHouse);
+    });
+
+    socket.on('disconnect', function() {
+        console.log('Disconnected from server');
+    });
+
+    Highcharts.setOptions({
+        global: {
+            useUTC: false
+        }
+    });
+
+    Highcharts.chart('container', {
+        chart: {
+            type: 'spline',
+            animation: Highcharts.svg,
+            marginRight: 10,
+            events: {
+                load: function() {
+                    var affordableSeries = this.series[0];
+                    var luxurySeries = this.series[1];
+                    setInterval(function() {
+                        var x = (new Date()).getTime(),
+                            affordableY = Math.random() * 100,
+                            luxuryY = Math.random() * 100;
+                        affordableSeries.addPoint([x, affordableY], true, true);
+                        luxurySeries.addPoint([x, luxuryY], true, true);
+                    }, 1000);
+                }
+            }
+        },
+        title: {
+            text: '出租房屋数量分析'
+        },
+        xAxis: {
+            type: 'datetime',
+            tickPixelInterval: 150
+        },
+        yAxis: {
+            title: {
+                text: 'Number of rooms/house'
+            },
+            plotLines: [{
+                value: 0,
+                width: 1,
+                color: '#808080'
+            }]
+        },
+        tooltip: {
+            formatter: function() {
+                return '<b>' + this.series.name + '</b><br/>' +
+                    Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x) + '<br/>' +
+                    Highcharts.numberFormat(this.y, 2);
+            }
+        },
+        legend: {
+            enabled: true
+        },
+        exporting: {
+            enabled: false
+        },
+        series: [{
+            name: 'Affordable Rooms',
+            data: (function() {
+                var data = [],
+                    time = (new Date()).getTime(),
+                    i;
+
+                for (i = -19; i <= 0; i += 1) {
+                    data.push({
+                        x: time + i * 1000,
+                        y: Math.random() * 100
+                    });
+                }
+                return data;
+            }())
+        }, {
+            name: 'Luxury House',
+            data: (function() {
+                var data = [],
+                    time = (new Date()).getTime(),
+                    i;
+
+                for (i = -19; i <= 0; i += 1) {
+                    data.push({
+                        x: time + i * 1000,
+                        y: Math.random() * 100
+                    });
+                }
+                return data;
+            }())
+        }]
+    });
+</script>
+</body>
+</html>
